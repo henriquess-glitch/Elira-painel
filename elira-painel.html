@@ -3,29 +3,29 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Elira — Painel Financeiro</title>
+<title>Painel Financeiro Elira</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@300;400;500;600&family=Inter:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
 <style>
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg:       #0C0C0C;
-    --surf:     #141414;
-    --card:     #1A1A1A;
-    --border:   #262626;
-    --border2:  #303030;
-    --accent:   #D4B896;
-    --accentd:  #A07850;
-    --green:    #6DBF6A;
-    --greend:   #2E5C2C;
-    --red:      #D96B6B;
-    --redd:     #6B2828;
-    --amber:    #CFA53A;
-    --amberd:   #6B5010;
-    --text:     #EEEBE6;
-    --muted:    #888480;
-    --dim:      #505050;
+    --bg:       #F7F3EE;
+    --surf:     #EDE8E1;
+    --card:     #FFFFFF;
+    --border:   #DDD6CC;
+    --border2:  #C8BFB3;
+    --accent:   #7A6A57;
+    --accentd:  #5C4F3D;
+    --green:    #4E7A5C;
+    --greend:   #D6EAD9;
+    --red:      #A84040;
+    --redd:     #F5DADA;
+    --amber:    #8C6D2F;
+    --amberd:   #F2E8D0;
+    --text:     #3A3028;
+    --muted:    #7A6E63;
+    --dim:      #A89E94;
     --mono:     'DM Mono', monospace;
   }
 
@@ -45,24 +45,31 @@
     align-items: center;
     justify-content: center;
     padding: 24px;
+    background: var(--bg);
   }
   .auth-card {
     width: 100%;
     max-width: 380px;
-    background: var(--card);
+    background: #FFFFFF;
     border: 0.5px solid var(--border);
     border-radius: 16px;
-    padding: 36px 32px;
+    padding: 40px 36px;
+    box-shadow: 0 2px 24px rgba(90,70,50,0.07);
   }
   .auth-logo {
-    width: 40px; height: 40px;
-    background: var(--accent);
-    border-radius: 10px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 18px; font-weight: 800; color: var(--bg);
-    margin-bottom: 24px;
+    margin-bottom: 28px;
   }
-  .auth-title { font-size: 20px; font-weight: 600; margin-bottom: 6px; }
+  .auth-logo-text {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 32px; font-weight: 400; letter-spacing: 0.18em;
+    color: var(--accent); display: block;
+  }
+  .auth-logo-sub {
+    font-size: 9px; font-weight: 400; letter-spacing: 0.28em;
+    color: var(--dim); text-transform: uppercase; display: block;
+    margin-top: 2px;
+  }
+  .auth-title { font-size: 15px; font-weight: 500; margin-bottom: 4px; color: var(--text); }
   .auth-sub { font-size: 13px; color: var(--muted); margin-bottom: 28px; }
   .field { margin-bottom: 16px; }
   .field label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; letter-spacing: 0.04em; text-transform: uppercase; }
@@ -90,16 +97,24 @@
     border-bottom: 0.5px solid var(--border);
     padding: 0 28px;
     display: flex; align-items: center; justify-content: space-between;
-    height: 56px; position: sticky; top: 0; z-index: 50;
-    background: var(--bg);
+    height: 60px; position: sticky; top: 0; z-index: 50;
+    background: #FFFFFF;
   }
-  .topbar-left { display: flex; align-items: center; gap: 12px; }
+  .topbar-left { display: flex; align-items: center; gap: 14px; }
   .logo-mark {
-    width: 30px; height: 30px; background: var(--accent); border-radius: 7px;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 13px; font-weight: 800; color: var(--bg);
+    display: flex; align-items: flex-end; gap: 1px;
   }
-  .topbar-title { font-size: 14px; font-weight: 600; }
+  .logo-mark span:first-child {
+    font-family: 'Cormorant Garamond', serif;
+    font-size: 20px; font-weight: 500; letter-spacing: 0.12em;
+    color: var(--accent);
+  }
+  .logo-mark span:last-child {
+    font-family: 'Inter', sans-serif;
+    font-size: 8px; font-weight: 400; letter-spacing: 0.22em;
+    color: var(--dim); margin-bottom: 3px; margin-left: 4px;
+  }
+  .topbar-title { font-size: 13px; font-weight: 500; color: var(--text); }
   .topbar-sub { font-size: 11px; color: var(--dim); margin-top: 1px; }
   .btn-logout {
     font-size: 12px; color: var(--muted); background: none; border: none;
@@ -113,16 +128,16 @@
     border-bottom: 0.5px solid var(--border);
     padding: 0 28px;
     display: flex; gap: 2px;
-    background: var(--bg);
+    background: #FFFFFF;
     overflow-x: auto;
   }
   .tab-btn {
-    padding: 13px 16px;
+    padding: 14px 16px;
     background: none; border: none; border-bottom: 2px solid transparent;
-    color: var(--muted); font-size: 12px; font-weight: 500;
+    color: var(--muted); font-size: 11px; font-weight: 500;
     font-family: inherit; cursor: pointer; white-space: nowrap;
     margin-bottom: -1px; transition: color 0.15s, border-color 0.15s;
-    letter-spacing: 0.01em;
+    letter-spacing: 0.06em; text-transform: uppercase;
   }
   .tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
   .tab-btn:hover:not(.active) { color: var(--text); }
@@ -187,7 +202,7 @@
   .bar-lbl { font-size: 10px; color: var(--muted); }
   .pe-line {
     position: absolute; left: 0; right: 0; height: 1px;
-    background: var(--amber); opacity: 0.7;
+    background: var(--amber); opacity: 0.8;
     pointer-events: none;
   }
   .pe-tag {
@@ -195,6 +210,8 @@
     font-size: 9px; color: var(--amber);
     background: var(--card); padding: 1px 5px;
     font-family: var(--mono);
+    border: 0.5px solid var(--amberd);
+    border-radius: 3px;
   }
 
   /* ── PROGRESS ── */
@@ -340,8 +357,11 @@
 <!-- AUTH -->
 <div id="auth-screen">
   <div class="auth-card">
-    <div class="auth-logo">E</div>
-    <div class="auth-title">Elira — Painel Financeiro</div>
+    <div class="auth-logo">
+      <span class="auth-logo-text">ELIRA</span>
+      <span class="auth-logo-sub">midsize</span>
+    </div>
+    <div class="auth-title">Painel Financeiro</div>
     <div class="auth-sub">Acesso restrito ao proprietário</div>
     <div class="field">
       <label>E-mail</label>
@@ -360,9 +380,13 @@
 <div id="app">
   <div class="topbar">
     <div class="topbar-left">
-      <div class="logo-mark">E</div>
+      <div class="logo-mark">
+        <span>ELIRA</span>
+        <span>MIDSIZE</span>
+      </div>
+      <div style="width:1px;height:28px;background:var(--border);margin:0 4px"></div>
       <div>
-        <div class="topbar-title">Elira — Painel Financeiro</div>
+        <div class="topbar-title">Painel Financeiro</div>
         <div class="topbar-sub" id="topbar-date">Carregando...</div>
       </div>
     </div>
