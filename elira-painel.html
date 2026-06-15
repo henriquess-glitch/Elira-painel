@@ -762,15 +762,18 @@ function showToast(msg) {
 }
 
 function calcMetrics() {
+  // Total fixo sempre calculado do array — qualquer alteração no array reflete em todo o painel
+  const totalFixos = CUSTOS_FIXOS_DETALHE.reduce((a,c) => a + c.valor, 0)
+                   + (state.extras_mes || []).reduce((a,e) => a + (e.valor||0), 0);
   const mc   = 1 - state.cmv_pct/100 - state.taxa_plat/100;
-  const pe   = state.custos_fixos / mc;
-  const fat30 = state.custos_fixos / (mc - 0.30);
-  const fat20 = state.custos_fixos / (mc - 0.20);
-  const fat10 = state.custos_fixos / (mc - 0.10);
+  const pe   = totalFixos / mc;
+  const fat30 = totalFixos / (mc - 0.30);
+  const fat20 = totalFixos / (mc - 0.20);
+  const fat10 = totalFixos / (mc - 0.10);
   const mesAtual = MESES[new Date().getMonth()];
   const fatAtual = state.faturamento[mesAtual] || 0;
-  const resultado = fatAtual * mc - state.custos_fixos;
-  return { mc, pe, fat10, fat20, fat30, fatAtual, resultado, mesAtual };
+  const resultado = fatAtual * mc - totalFixos;
+  return { mc, pe, fat10, fat20, fat30, fatAtual, resultado, mesAtual, totalFixos };
 }
 
 // ── AUTH ──
@@ -860,11 +863,12 @@ function renderAll() {
 
 // ── VISÃO GERAL ──
 function renderVisao() {
-  const { mc, pe, fat10, fat20, fat30, fatAtual, resultado, mesAtual } = calcMetrics();
+  const { mc, pe, fat10, fat20, fat30, fatAtual, resultado, mesAtual, totalFixos } = calcMetrics();
 
   $('kpi-pe').textContent  = fmtK(pe);
   $('kpi-mc').textContent  = fmtP(mc * 100);
-  $('kpi-cf').textContent  = fmtK(state.custos_fixos);
+  $('kpi-cf').textContent  = fmtK(totalFixos);
+  $('kpi-cf').closest('.metric-card').querySelector('.metric-sub').textContent = `${CUSTOS_FIXOS_DETALHE.length + (state.extras_mes||[]).length} categorias`;
 
   const isPos = resultado >= 0;
   $('kpi-resultado').textContent = fmtK(Math.abs(resultado));
@@ -1001,7 +1005,7 @@ function renderFaturamento() {
 
 // ── DESCONTO ──
 function renderDesconto() {
-  const { pe } = calcMetrics();
+  const { pe, totalFixos } = calcMetrics();
   const preco  = state.preco_medio_peca;
   const cmv    = state.cmv_por_peca;
   const taxa   = state.taxa_plat / 100;
@@ -1035,7 +1039,7 @@ function renderDesconto() {
       msg = `⚠ Acima de ${maxDesc.toFixed(0)}% você vende a peça com prejuízo direto — abaixo do custo variável.`;
       cls = 'alert-red';
     } else if (d > 20) {
-      const newPE = mc > 0 ? state.custos_fixos / (mc / np) : Infinity;
+      const newPE = mc > 0 ? totalFixos / (mc / np) : Infinity;
       msg = `Desconto alto. Seu ponto de equilíbrio sobe para ${fmtK(newPE)}.`;
       cls = 'alert-amber';
     } else {
@@ -1055,7 +1059,7 @@ function renderDesconto() {
     const mc  = np * (1 - taxa) - cmv;
     const pct = mc / np * 100;
     const isNeg = mc <= 0;
-    const newPE = mc > 0 ? fmtK(state.custos_fixos / (mc/np)) : '∞';
+    const newPE = mc > 0 ? fmtK(totalFixos / (mc/np)) : '∞';
     let badge = '';
     if (d === 0) badge = '<span class="badge badge-dim">referência</span>';
     else if (isNeg) badge = '<span class="badge badge-red">prejuízo</span>';
@@ -1075,14 +1079,14 @@ function renderDesconto() {
 
 // ── SIMULADOR META ──
 function renderSimulador() {
-  const { mc, pe, fat10, fat20, fat30, fatAtual } = calcMetrics();
+  const { mc, pe, fat10, fat20, fat30, fatAtual, totalFixos } = calcMetrics();
 
   $('sm-pe-label').textContent = `PE ${fmtK(pe)}`;
   $('sm-pe-marker').style.left = clamp((pe/150000)*100,0,100) + '%';
 
   function update() {
     const fat      = parseFloat($('sl-fat').value);
-    const result   = fat * mc - state.custos_fixos;
+    const result   = fat * mc - totalFixos;
     const marginP  = result / fat * 100;
     const isPos    = result >= 0;
 
@@ -1135,13 +1139,14 @@ function renderSimulador() {
 
 // ── CUSTOS ──
 function renderCustos() {
-  const { mc } = calcMetrics();
+  const { mc, totalFixos } = calcMetrics();
   const total  = CUSTOS_FIXOS_DETALHE.reduce((a,c) => a+c.valor, 0);
   const mkt    = CUSTOS_FIXOS_DETALHE.filter(c=>c.grupo==='marketing').reduce((a,c)=>a+c.valor,0);
   const op     = total - mkt;
+  const extras = (state.extras_mes||[]).reduce((a,e)=>a+(e.valor||0),0);
 
-  $('total-fixos').textContent = fmtR(total);
-  $('custos-split').textContent = `Marketing: ${fmtR(mkt)} (${Math.round(mkt/total*100)}%) · Operacional: ${fmtR(op)} (${Math.round(op/total*100)}%)`;
+  $('total-fixos').textContent = fmtR(totalFixos);
+  $('custos-split').textContent = `Marketing: ${fmtR(mkt)} (${Math.round(mkt/totalFixos*100)}%) · Operacional: ${fmtR(op)} (${Math.round(op/totalFixos*100)}%)${extras>0?' · Extras: '+fmtR(extras):''}`;
 
   $('custos-rows').innerHTML = CUSTOS_FIXOS_DETALHE.map(c => {
     const pct   = (c.valor / total) * 100;
