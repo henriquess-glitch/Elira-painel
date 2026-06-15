@@ -430,7 +430,7 @@
             <div class="metric-sub" id="kpi-resultado-sub">—</div>
           </div>
         </div>
-        <div class="grid-3">
+        <div class="grid-4">
           <div class="metric-card">
             <div class="metric-label">Faturamento mês atual</div>
             <div class="metric-value" id="kpi-fat-atual" style="color:var(--accent)">—</div>
@@ -440,6 +440,11 @@
             <div class="metric-label">Gap para o equilíbrio</div>
             <div class="metric-value" id="kpi-gap">—</div>
             <div class="metric-sub" id="kpi-gap-sub">—</div>
+          </div>
+          <div class="metric-card">
+            <div class="metric-label">Volume de pedidos</div>
+            <div class="metric-value" id="kpi-pedidos" style="color:var(--accent)">—</div>
+            <div class="metric-sub" id="kpi-pedidos-sub">pedidos estimados no mês</div>
           </div>
           <div class="metric-card">
             <div class="metric-label">Meta 30% lucro</div>
@@ -609,6 +614,27 @@
       </div>
 
       <div class="section">
+        <div class="section-label">Custos extras do mês</div>
+        <div class="card" style="padding:0;overflow:hidden">
+          <div id="custos-extras-rows"></div>
+          <div style="padding:14px 18px;border-top:0.5px solid var(--border)">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Adicionar custo extra</div>
+            <div style="display:flex;gap:8px;flex-wrap:wrap">
+              <input id="extra-nome" type="text" placeholder="Descrição (ex: Frete especial)"
+                style="flex:2;min-width:160px;padding:8px 12px;background:var(--surf);border:0.5px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;outline:none;">
+              <input id="extra-valor" type="number" placeholder="R$ 0,00"
+                style="flex:1;min-width:120px;padding:8px 12px;background:var(--surf);border:0.5px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;">
+              <button id="btn-add-extra" class="btn-save" style="margin-top:0;padding:8px 18px;white-space:nowrap">+ Adicionar</button>
+            </div>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-top:14px;padding-top:12px;border-top:0.5px solid var(--border)">
+              <span style="font-size:12px;color:var(--muted)">Total extras do mês</span>
+              <span id="total-extras" style="font-size:16px;font-weight:700;color:var(--accent);font-family:var(--mono)">R$ 0</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="section">
         <div class="section-label">Custos variáveis (% do faturamento)</div>
         <div class="card" id="custos-var-card"></div>
       </div>
@@ -691,7 +717,8 @@ const DEFAULTS = {
   faturamento: {
     Jan: 18000, Fev: 25000, Mar: 51000, Abr: 54000,
     Mai: 16000, Jun: 0, Jul: 0, Ago: 0, Set: 0, Out: 0, Nov: 0, Dez: 0
-  }
+  },
+  extras_mes: []
 };
 
 const CUSTOS_FIXOS_DETALHE = [
@@ -798,7 +825,8 @@ async function showApp() {
       if (snap.exists()) {
         const d = snap.data();
         state = { ...DEFAULTS, ...d,
-          faturamento: { ...DEFAULTS.faturamento, ...(d.faturamento || {}) }
+          faturamento: { ...DEFAULTS.faturamento, ...(d.faturamento || {}) },
+          extras_mes: d.extras_mes || []
         };
       }
       renderAll();
@@ -849,6 +877,12 @@ function renderVisao() {
   $('kpi-gap').textContent   = gap > 0 ? fmtK(gap) : '✓ superado';
   $('kpi-gap').style.color   = gap > 0 ? 'var(--red)' : 'var(--green)';
   $('kpi-gap-sub').textContent = gap > 0 ? `faltam ${fmtK(gap)} para o PE` : 'acima do ponto de equilíbrio';
+
+  const pedidosMes = fatAtual > 0 ? Math.round(fatAtual / state.ticket_medio) : 0;
+  const pedidosPE  = Math.round(pe / state.ticket_medio);
+  $('kpi-pedidos').textContent = pedidosMes;
+  $('kpi-pedidos').style.color = pedidosMes >= pedidosPE ? 'var(--green)' : 'var(--accent)';
+  $('kpi-pedidos-sub').textContent = `precisam de ${pedidosPE} para o equilíbrio`;
 
   $('kpi-meta30').textContent   = fmtK(fat30);
   $('kpi-meta30-sub').textContent = `${Math.round(fat30 / state.ticket_medio)} pedidos/mês`;
@@ -1146,7 +1180,50 @@ function renderCustos() {
       CMV calculado de 3.639 peças em 4 coleções reais. Custo médio por peça:
       <strong style="color:var(--accent)">R$ ${state.cmv_por_peca.toFixed(2)}</strong>
     </div>`;
+
+  // ── Custos extras ──
+  renderCustosExtras();
 }
+
+function renderCustosExtras() {
+  const extras = state.extras_mes || [];
+  const totalExtras = extras.reduce((a, e) => a + (e.valor || 0), 0);
+  $('total-extras').textContent = fmtR(totalExtras);
+
+  $('custos-extras-rows').innerHTML = extras.length === 0
+    ? `<div style="padding:16px 18px;font-size:13px;color:var(--dim);text-align:center">Nenhum custo extra registrado este mês</div>`
+    : extras.map((e, i) => `
+      <div style="display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:0.5px solid var(--border)">
+        <div style="width:5px;height:5px;border-radius:50%;background:var(--amber);flex-shrink:0"></div>
+        <div style="flex:1;font-size:13px">${e.nome}</div>
+        <div style="font-size:13px;font-weight:600;font-family:var(--mono);color:var(--amber)">${fmtR(e.valor)}</div>
+        <button onclick="removeExtra(${i})" style="background:none;border:none;cursor:pointer;color:var(--dim);font-size:16px;padding:0 4px;line-height:1" title="Remover">×</button>
+      </div>`).join('');
+
+  // listener do botão adicionar (re-registra sempre que renderiza)
+  const btn = $('btn-add-extra');
+  btn.onclick = () => {
+    const nome  = $('extra-nome').value.trim();
+    const valor = parseFloat($('extra-valor').value) || 0;
+    if (!nome || valor <= 0) { showToast('Preencha a descrição e o valor'); return; }
+    state.extras_mes = [...(state.extras_mes || []), { nome, valor }];
+    $('extra-nome').value  = '';
+    $('extra-valor').value = '';
+    saveToFirebase();
+    renderCustosExtras();
+  };
+
+  // enter nos inputs
+  [$('extra-nome'), $('extra-valor')].forEach(el => {
+    el.onkeydown = e => { if (e.key === 'Enter') btn.click(); };
+  });
+}
+
+window.removeExtra = (idx) => {
+  state.extras_mes = (state.extras_mes || []).filter((_, i) => i !== idx);
+  saveToFirebase();
+  renderCustosExtras();
+};
 
 // ── CONFIG ──
 function renderConfig() {
