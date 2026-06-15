@@ -708,7 +708,7 @@ const firebaseConfig = {
 const MESES = ['Jan','Fev','Mar','Abr','Mai','Jun','Jul','Ago','Set','Out','Nov','Dez'];
 
 const DEFAULTS = {
-  custos_fixos: 24550,
+  custos_fixos: 31217,
   cmv_pct: 39.9,
   taxa_plat: 3.5,
   ticket_medio: 701.56,
@@ -722,16 +722,17 @@ const DEFAULTS = {
 };
 
 const CUSTOS_FIXOS_DETALHE = [
-  { nome: 'Investimento em tráfego (ads)', valor: 8000, grupo: 'marketing' },
-  { nome: 'Made — gestão Instagram',       valor: 4500, grupo: 'marketing' },
-  { nome: 'SMKV — gestão tráfego',         valor: 3200, grupo: 'marketing' },
-  { nome: 'Influencers',                   valor: 2000, grupo: 'marketing' },
-  { nome: 'Aviamentos',                    valor: 2500, grupo: 'operacional' },
-  { nome: 'Aluguel',                       valor: 2200, grupo: 'operacional' },
-  { nome: 'Salário sócio',                 valor: 1400, grupo: 'operacional' },
-  { nome: 'Trocas / devoluções',           valor:  300, grupo: 'operacional' },
-  { nome: 'Celesc (energia)',              valor:  250, grupo: 'operacional' },
-  { nome: 'Internet',                      valor:  200, grupo: 'operacional' },
+  { nome: 'Investimento em tráfego (ads)', valor: 8000,   grupo: 'marketing' },
+  { nome: 'Made — gestão Instagram',       valor: 4500,   grupo: 'marketing' },
+  { nome: 'SMKV — gestão tráfego',         valor: 3200,   grupo: 'marketing' },
+  { nome: 'Fotografia de campanha',        valor: 6667,   grupo: 'marketing', obs: 'Rateio mensal — R$20.000/trimestre' },
+  { nome: 'Influencers',                   valor: 2000,   grupo: 'marketing' },
+  { nome: 'Aviamentos',                    valor: 2500,   grupo: 'operacional' },
+  { nome: 'Aluguel',                       valor: 2200,   grupo: 'operacional' },
+  { nome: 'Salário sócio',                 valor: 1400,   grupo: 'operacional' },
+  { nome: 'Trocas / devoluções',           valor:  300,   grupo: 'operacional' },
+  { nome: 'Celesc (energia)',              valor:  250,   grupo: 'operacional' },
+  { nome: 'Internet',                      valor:  200,   grupo: 'operacional' },
 ];
 
 let app, auth, db, state = JSON.parse(JSON.stringify(DEFAULTS));
@@ -1149,7 +1150,8 @@ function renderCustos() {
       <div style="display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:0.5px solid var(--border)">
         <div style="width:5px;height:5px;border-radius:50%;background:${isMkt?'var(--accent)':'var(--dim)'};flex-shrink:0"></div>
         <div style="flex:1">
-          <div style="font-size:13px;margin-bottom:4px">${c.nome}</div>
+          <div style="font-size:13px;margin-bottom:${c.obs?'2px':'4px'}">${c.nome}</div>
+          ${c.obs ? `<div style="font-size:10px;color:var(--dim);margin-bottom:4px">${c.obs}</div>` : ''}
           <div style="height:3px;background:var(--surf);border-radius:2px;overflow:hidden">
             <div style="width:${pct}%;height:100%;background:${isMkt?'var(--accentd)':'var(--dim)'}"></div>
           </div>
