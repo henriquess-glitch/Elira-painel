@@ -826,15 +826,25 @@ async function showApp() {
     onSnapshot(ref, snap => {
       if (snap.exists()) {
         const d = snap.data();
-        state = { ...DEFAULTS, ...d,
-          faturamento: { ...DEFAULTS.faturamento, ...(d.faturamento || {}) },
+        // Só usa dados do Firebase se tiver faturamento salvo
+        const temFaturamento = d.faturamento && Object.values(d.faturamento).some(v => v > 0);
+        state = {
+          ...DEFAULTS,
+          ...d,
+          faturamento: temFaturamento
+            ? { ...DEFAULTS.faturamento, ...d.faturamento }
+            : { ...DEFAULTS.faturamento },
           extras_mes: d.extras_mes || [],
           custos_fixos_lista: (d.custos_fixos_lista && d.custos_fixos_lista.length > 0)
             ? d.custos_fixos_lista
-            : DEFAULTS.custos_fixos_lista
+            : JSON.parse(JSON.stringify(DEFAULTS.custos_fixos_lista))
         };
+        // Se não tinha faturamento, salva os defaults agora
+        if (!temFaturamento) {
+          setDoc(ref, state).catch(e => console.warn('Erro ao salvar defaults:', e));
+        }
       } else {
-        // Primeira vez — inicializa com DEFAULTS e salva no Firebase
+        // Documento não existe — cria com todos os defaults
         state = JSON.parse(JSON.stringify(DEFAULTS));
         setDoc(ref, state).catch(e => console.warn('Erro ao inicializar:', e));
       }
