@@ -718,22 +718,21 @@ const DEFAULTS = {
     Jan: 18000, Fev: 25000, Mar: 51000, Abr: 54000,
     Mai: 16000, Jun: 0, Jul: 0, Ago: 0, Set: 0, Out: 0, Nov: 0, Dez: 0
   },
-  extras_mes: []
+  extras_mes: [],
+  custos_fixos_lista: [
+    { nome: 'Investimento em tráfego (ads)', valor: 8000,   grupo: 'marketing' },
+    { nome: 'Made — gestão Instagram',       valor: 4500,   grupo: 'marketing' },
+    { nome: 'SMKV — gestão tráfego',         valor: 3200,   grupo: 'marketing' },
+    { nome: 'Fotografia de campanha',        valor: 6667,   grupo: 'marketing', obs: 'Rateio mensal — R$20.000/trimestre' },
+    { nome: 'Influencers',                   valor: 2000,   grupo: 'marketing' },
+    { nome: 'Aviamentos',                    valor: 2500,   grupo: 'operacional' },
+    { nome: 'Aluguel',                       valor: 2200,   grupo: 'operacional' },
+    { nome: 'Salário sócio',                 valor: 1400,   grupo: 'operacional' },
+    { nome: 'Trocas / devoluções',           valor:  300,   grupo: 'operacional' },
+    { nome: 'Celesc (energia)',              valor:  250,   grupo: 'operacional' },
+    { nome: 'Internet',                      valor:  200,   grupo: 'operacional' },
+  ]
 };
-
-const CUSTOS_FIXOS_DETALHE = [
-  { nome: 'Investimento em tráfego (ads)', valor: 8000,   grupo: 'marketing' },
-  { nome: 'Made — gestão Instagram',       valor: 4500,   grupo: 'marketing' },
-  { nome: 'SMKV — gestão tráfego',         valor: 3200,   grupo: 'marketing' },
-  { nome: 'Fotografia de campanha',        valor: 6667,   grupo: 'marketing', obs: 'Rateio mensal — R$20.000/trimestre' },
-  { nome: 'Influencers',                   valor: 2000,   grupo: 'marketing' },
-  { nome: 'Aviamentos',                    valor: 2500,   grupo: 'operacional' },
-  { nome: 'Aluguel',                       valor: 2200,   grupo: 'operacional' },
-  { nome: 'Salário sócio',                 valor: 1400,   grupo: 'operacional' },
-  { nome: 'Trocas / devoluções',           valor:  300,   grupo: 'operacional' },
-  { nome: 'Celesc (energia)',              valor:  250,   grupo: 'operacional' },
-  { nome: 'Internet',                      valor:  200,   grupo: 'operacional' },
-];
 
 let app, auth, db, state = JSON.parse(JSON.stringify(DEFAULTS));
 let firebaseReady = false;
@@ -762,18 +761,18 @@ function showToast(msg) {
 }
 
 function calcMetrics() {
-  // Total fixo sempre calculado do array — qualquer alteração no array reflete em todo o painel
-  const totalFixos = CUSTOS_FIXOS_DETALHE.reduce((a,c) => a + c.valor, 0)
+  const lista = state.custos_fixos_lista || DEFAULTS.custos_fixos_lista;
+  const totalFixos = lista.reduce((a,c) => a + (c.valor||0), 0)
                    + (state.extras_mes || []).reduce((a,e) => a + (e.valor||0), 0);
-  const mc   = 1 - state.cmv_pct/100 - state.taxa_plat/100;
-  const pe   = totalFixos / mc;
-  const fat30 = totalFixos / (mc - 0.30);
-  const fat20 = totalFixos / (mc - 0.20);
-  const fat10 = totalFixos / (mc - 0.10);
+  const mc     = 1 - state.cmv_pct/100 - state.taxa_plat/100;
+  const pe     = totalFixos / mc;
+  const fat30  = totalFixos / (mc - 0.30);
+  const fat20  = totalFixos / (mc - 0.20);
+  const fat10  = totalFixos / (mc - 0.10);
   const mesAtual = MESES[new Date().getMonth()];
   const fatAtual = state.faturamento[mesAtual] || 0;
   const resultado = fatAtual * mc - totalFixos;
-  return { mc, pe, fat10, fat20, fat30, fatAtual, resultado, mesAtual, totalFixos };
+  return { mc, pe, fat10, fat20, fat30, fatAtual, resultado, mesAtual, totalFixos, lista };
 }
 
 // ── AUTH ──
@@ -830,7 +829,8 @@ async function showApp() {
         const d = snap.data();
         state = { ...DEFAULTS, ...d,
           faturamento: { ...DEFAULTS.faturamento, ...(d.faturamento || {}) },
-          extras_mes: d.extras_mes || []
+          extras_mes: d.extras_mes || [],
+          custos_fixos_lista: d.custos_fixos_lista || DEFAULTS.custos_fixos_lista
         };
       }
       renderAll();
@@ -1139,20 +1139,19 @@ function renderSimulador() {
 
 // ── CUSTOS ──
 function renderCustos() {
-  const { mc, totalFixos } = calcMetrics();
-  const total  = CUSTOS_FIXOS_DETALHE.reduce((a,c) => a+c.valor, 0);
-  const mkt    = CUSTOS_FIXOS_DETALHE.filter(c=>c.grupo==='marketing').reduce((a,c)=>a+c.valor,0);
-  const op     = total - mkt;
+  const { mc, totalFixos, lista } = calcMetrics();
+  const mkt    = lista.filter(c=>c.grupo==='marketing').reduce((a,c)=>a+c.valor,0);
+  const op     = lista.filter(c=>c.grupo==='operacional').reduce((a,c)=>a+c.valor,0);
   const extras = (state.extras_mes||[]).reduce((a,e)=>a+(e.valor||0),0);
 
   $('total-fixos').textContent = fmtR(totalFixos);
-  $('custos-split').textContent = `Marketing: ${fmtR(mkt)} (${Math.round(mkt/totalFixos*100)}%) · Operacional: ${fmtR(op)} (${Math.round(op/totalFixos*100)}%)${extras>0?' · Extras: '+fmtR(extras):''}`;
+  $('custos-split').textContent = `Marketing: ${fmtR(mkt)} · Operacional: ${fmtR(op)}${extras>0?' · Extras: '+fmtR(extras):''}`;
 
-  $('custos-rows').innerHTML = CUSTOS_FIXOS_DETALHE.map(c => {
-    const pct   = (c.valor / total) * 100;
+  $('custos-rows').innerHTML = lista.map((c, i) => {
+    const pct   = totalFixos > 0 ? (c.valor / totalFixos) * 100 : 0;
     const isMkt = c.grupo === 'marketing';
     return `
-      <div style="display:flex;align-items:center;gap:12px;padding:11px 18px;border-bottom:0.5px solid var(--border)">
+      <div id="custo-row-${i}" style="display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:0.5px solid var(--border)">
         <div style="width:5px;height:5px;border-radius:50%;background:${isMkt?'var(--accent)':'var(--dim)'};flex-shrink:0"></div>
         <div style="flex:1">
           <div style="font-size:13px;margin-bottom:${c.obs?'2px':'4px'}">${c.nome}</div>
@@ -1161,12 +1160,59 @@ function renderCustos() {
             <div style="width:${pct}%;height:100%;background:${isMkt?'var(--accentd)':'var(--dim)'}"></div>
           </div>
         </div>
-        <div style="text-align:right">
+        <div style="text-align:right;min-width:72px">
           <div style="font-size:13px;font-weight:600;font-family:var(--mono)">${fmtR(c.valor)}</div>
           <div style="font-size:10px;color:var(--dim);margin-top:2px">${pct.toFixed(1)}%</div>
         </div>
+        <div style="display:flex;gap:4px;flex-shrink:0">
+          <button onclick="editarCustoFixo(${i})" title="Editar"
+            style="background:var(--surf);border:0.5px solid var(--border2);border-radius:6px;cursor:pointer;color:var(--muted);font-size:12px;padding:4px 8px;font-family:inherit">✏️</button>
+          <button onclick="removerCustoFixo(${i})" title="Remover"
+            style="background:var(--redd);border:0.5px solid var(--red);border-radius:6px;cursor:pointer;color:var(--red);font-size:13px;padding:4px 8px;font-family:inherit">×</button>
+        </div>
       </div>`;
   }).join('');
+
+  // Linha de adicionar novo custo fixo
+  const addRow = document.createElement('div');
+  addRow.style.cssText = 'padding:14px 18px;border-top:0.5px solid var(--border)';
+  addRow.innerHTML = `
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">Adicionar custo fixo permanente</div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:8px">
+      <input id="fixo-nome" type="text" placeholder="Nome do custo"
+        style="flex:2;min-width:140px;padding:8px 12px;background:var(--surf);border:0.5px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:inherit;outline:none;">
+      <input id="fixo-valor" type="number" placeholder="Valor R$"
+        style="flex:1;min-width:110px;padding:8px 12px;background:var(--surf);border:0.5px solid var(--border2);border-radius:8px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;">
+      <select id="fixo-grupo"
+        style="padding:8px 12px;background:var(--surf);border:0.5px solid var(--border2);border-radius:8px;color:var(--muted);font-size:12px;font-family:inherit;outline:none;">
+        <option value="marketing">Marketing</option>
+        <option value="operacional">Operacional</option>
+      </select>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <input id="fixo-obs" type="text" placeholder="Observação (opcional, ex: R$20k/trimestre)"
+        style="flex:1;min-width:200px;padding:8px 12px;background:var(--surf);border:0.5px solid var(--border2);border-radius:8px;color:var(--text);font-size:12px;font-family:inherit;outline:none;">
+      <button id="btn-add-fixo" style="padding:8px 18px;background:var(--accent);color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:600;font-family:inherit;cursor:pointer;white-space:nowrap">+ Adicionar</button>
+    </div>`;
+  $('custos-rows').appendChild(addRow);
+
+  document.getElementById('btn-add-fixo').onclick = () => {
+    const nome  = document.getElementById('fixo-nome').value.trim();
+    const valor = parseFloat(document.getElementById('fixo-valor').value) || 0;
+    const grupo = document.getElementById('fixo-grupo').value;
+    const obs   = document.getElementById('fixo-obs').value.trim();
+    if (!nome || valor <= 0) { showToast('Preencha o nome e o valor'); return; }
+    const novo = { nome, valor, grupo };
+    if (obs) novo.obs = obs;
+    state.custos_fixos_lista = [...(state.custos_fixos_lista || []), novo];
+    saveToFirebase();
+    renderAll();
+    showToast(`"${nome}" adicionado ✓`);
+  };
+
+  ['fixo-nome','fixo-valor','fixo-obs'].forEach(id => {
+    document.getElementById(id).onkeydown = e => { if(e.key==='Enter') document.getElementById('btn-add-fixo').click(); };
+  });
 
   // variáveis
   $('custos-var-card').innerHTML = [
@@ -1188,9 +1234,51 @@ function renderCustos() {
       <strong style="color:var(--accent)">R$ ${state.cmv_por_peca.toFixed(2)}</strong>
     </div>`;
 
-  // ── Custos extras ──
   renderCustosExtras();
 }
+
+// ── Editar custo fixo inline ──
+window.editarCustoFixo = (idx) => {
+  const c = (state.custos_fixos_lista || [])[idx];
+  if (!c) return;
+  const row = document.getElementById(`custo-row-${idx}`);
+  if (!row) return;
+  row.innerHTML = `
+    <div style="flex:1;display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:4px 0">
+      <input id="edit-nome-${idx}" type="text" value="${c.nome}"
+        style="flex:2;min-width:140px;padding:6px 10px;background:var(--surf);border:0.5px solid var(--accent);border-radius:7px;color:var(--text);font-size:13px;font-family:inherit;outline:none;">
+      <input id="edit-valor-${idx}" type="number" value="${c.valor}"
+        style="flex:1;min-width:100px;padding:6px 10px;background:var(--surf);border:0.5px solid var(--accent);border-radius:7px;color:var(--text);font-size:13px;font-family:var(--mono);outline:none;">
+      <input id="edit-obs-${idx}" type="text" value="${c.obs||''}" placeholder="Observação (opcional)"
+        style="flex:2;min-width:160px;padding:6px 10px;background:var(--surf);border:0.5px solid var(--border2);border-radius:7px;color:var(--text);font-size:12px;font-family:inherit;outline:none;">
+      <button onclick="salvarCustoFixo(${idx})"
+        style="padding:6px 14px;background:var(--accent);color:#fff;border:none;border-radius:7px;cursor:pointer;font-size:12px;font-weight:600;font-family:inherit">Salvar</button>
+      <button onclick="renderCustos()"
+        style="padding:6px 12px;background:none;border:0.5px solid var(--border2);border-radius:7px;cursor:pointer;color:var(--muted);font-size:12px;font-family:inherit">Cancelar</button>
+    </div>`;
+  document.getElementById(`edit-nome-${idx}`).focus();
+};
+
+window.salvarCustoFixo = (idx) => {
+  const nome  = document.getElementById(`edit-nome-${idx}`).value.trim();
+  const valor = parseFloat(document.getElementById(`edit-valor-${idx}`).value) || 0;
+  const obs   = document.getElementById(`edit-obs-${idx}`).value.trim();
+  if (!nome || valor <= 0) { showToast('Preencha o nome e o valor'); return; }
+  state.custos_fixos_lista[idx] = { ...state.custos_fixos_lista[idx], nome, valor, obs: obs || undefined };
+  saveToFirebase();
+  renderAll();
+  showToast('Custo atualizado ✓');
+};
+
+window.removerCustoFixo = (idx) => {
+  const c = (state.custos_fixos_lista || [])[idx];
+  if (!c) return;
+  if (!confirm(`Remover "${c.nome}" (${fmtR(c.valor)})?`)) return;
+  state.custos_fixos_lista = state.custos_fixos_lista.filter((_,i) => i !== idx);
+  saveToFirebase();
+  renderAll();
+  showToast(`"${c.nome}" removido`);
+};
 
 function renderCustosExtras() {
   const extras = state.extras_mes || [];
