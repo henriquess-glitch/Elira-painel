@@ -907,7 +907,7 @@ function renderProjecao() {
   // conversão e formatação conforme métrica escolhida
   const isPed = projMetrica === 'pedidos';
   const cv = v => isPed ? v / tm : v;                       // converte R$ → pedidos
-  const fmtFull = v => isPed ? `${Math.round(v)} pedidos` : fmtR(Math.round(v));
+  const fmtFull = v => isPed ? `${Math.round(v/tm)} pedidos` : fmtR(Math.round(v));
   const fmtAxis = v => isPed ? `${Math.round(v)}` : `${(v/1000).toFixed(0)}k`;
 
   // Meses com dados reais (valor > 0), em ordem
@@ -1049,7 +1049,7 @@ function renderProjecao() {
   const projTend = futurosIdx.reduce((a,i)=>a+cenarios.tendencia.dados[i],0);
   const projCons = futurosIdx.reduce((a,i)=>a+cenarios.conservador.dados[i],0);
   const projOtim = futurosIdx.reduce((a,i)=>a+cenarios.otimista.dados[i],0);
-  const unidade = isPed ? 'pedidos' : '';
+  // fmtFull recebe valor em R$ e já converte para a métrica corrente
   $('proj-resumo').innerHTML = `
     <strong style="color:var(--text)">Projeção para fechar 2026</strong> (realizado ${fmtFull(totalReal)} + ${futurosIdx.length} meses projetados):<br>
     <span style="color:var(--red)">● Conservador:</span> ${fmtFull(totalReal+projCons)} &nbsp;·&nbsp;
