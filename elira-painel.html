@@ -1098,16 +1098,18 @@ function renderDesconto() {
 
 // ── SIMULADOR META ──
 function renderSimulador() {
-  const { mc, pe, fat10, fat20, fat30, fatAtual, totalFixos } = calcMetrics();
+  const { mc, pe, fat10, fat20, fat30, fatAtual } = calcMetrics();
 
   $('sm-pe-label').textContent = `PE ${fmtK(pe)}`;
   $('sm-pe-marker').style.left = clamp((pe/150000)*100,0,100) + '%';
 
   function update() {
-    const fat      = parseFloat($('sl-fat').value);
-    const result   = fat * mc - totalFixos;
-    const marginP  = result / fat * 100;
-    const isPos    = result >= 0;
+    // Sempre pega valores frescos para refletir qualquer mudança de custo
+    const { mc: mcFresh, totalFixos: tfFresh, pe: peFresh } = calcMetrics();
+    const fat     = parseFloat($('sl-fat').value);
+    const result  = fat * mcFresh - tfFresh;
+    const marginP = result / fat * 100;
+    const isPos   = result >= 0;
 
     $('sl-fat-val').textContent = fmtK(fat);
     $('sm-resultado').textContent = fmtR(Math.abs(result));
@@ -1120,9 +1122,17 @@ function renderSimulador() {
     const barW = clamp((fat/150000)*100, 0, 100);
     $('sm-bar').style.width      = barW + '%';
     $('sm-bar').style.background = isPos ? 'var(--green)' : 'var(--red)';
+
+    // Atualiza marcador do PE na barra
+    $('sm-pe-label').textContent = `PE ${fmtK(peFresh)}`;
+    $('sm-pe-marker').style.left = clamp((peFresh/150000)*100,0,100) + '%';
   }
 
-  $('sl-fat').addEventListener('input', update);
+  // Remove listener antigo antes de adicionar novo (evita duplicatas)
+  const slider = $('sl-fat');
+  const newSlider = slider.cloneNode(true);
+  slider.parentNode.replaceChild(newSlider, slider);
+  newSlider.addEventListener('input', update);
   update();
 
   // metas progress
