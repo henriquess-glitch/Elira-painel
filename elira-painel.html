@@ -892,8 +892,9 @@ function renderAll() {
   try { renderProjecao(); } catch(e) { console.warn('Projeção:', e); }
 }
 
-// estado dos cenários visíveis (persistido só na sessão)
+// estado dos cenários visíveis e métrica (persistido só na sessão)
 const projVisivel = { conservador: true, tendencia: true, otimista: true };
+let projMetrica = 'valor'; // 'valor' ou 'pedidos'
 
 // ── PROJEÇÃO (gráfico interativo) ──
 function renderProjecao() {
@@ -901,6 +902,13 @@ function renderProjecao() {
   if (!host) return;
   const { pe } = calcMetrics();
   const fat = state.faturamento || DEFAULTS.faturamento;
+  const tm  = state.ticket_medio || 701.56;
+
+  // conversão e formatação conforme métrica escolhida
+  const isPed = projMetrica === 'pedidos';
+  const cv = v => isPed ? v / tm : v;                       // converte R$ → pedidos
+  const fmtFull = v => isPed ? `${Math.round(v)} pedidos` : fmtR(Math.round(v));
+  const fmtAxis = v => isPed ? `${Math.round(v)}` : `${(v/1000).toFixed(0)}k`;
 
   // Meses com dados reais (valor > 0), em ordem
   const reaisIdx = [];
@@ -910,13 +918,10 @@ function renderProjecao() {
   const ultimoReal = reaisIdx[reaisIdx.length - 1];
   const valoresReais = reaisIdx.map(i => Number(fat[MESES[i]]) || 0);
 
-  // ── Cálculos de projeção ──
+  // ── Cálculos de projeção (sempre em R$) ──
   const n = valoresReais.length;
-  const media = valoresReais.reduce((a,b)=>a+b,0) / n;
-  // média móvel dos últimos 3 (ou menos)
   const ult3 = valoresReais.slice(-3);
   const mediaMovel = ult3.reduce((a,b)=>a+b,0) / ult3.length;
-  // regressão linear simples (tendência) sobre os pontos reais
   const xs = reaisIdx, ys = valoresReais;
   const mx = xs.reduce((a,b)=>a+b,0)/n, my = ys.reduce((a,b)=>a+b,0)/n;
   let num=0, den=0;
@@ -924,7 +929,6 @@ function renderProjecao() {
   const slope = den ? num/den : 0;
   const intercept = my - slope*mx;
 
-  // Cenários para os meses futuros (do mês após o último real até Dez)
   const futurosIdx = [];
   for (let i = ultimoReal+1; i < 12; i++) futurosIdx.push(i);
 
@@ -933,30 +937,25 @@ function renderProjecao() {
     tendencia:   { nome: 'Tendência',   cor: 'var(--accent)', dados: {} },
     otimista:    { nome: 'Otimista',    cor: 'var(--green)', dados: {} },
   };
-
   futurosIdx.forEach((i, k) => {
-    // Conservador: média móvel com leve declínio (-3% ao mês acumulado)
     cenarios.conservador.dados[i] = Math.max(0, mediaMovel * Math.pow(0.97, k+1));
-    // Tendência: regressão linear projetada
-    cenarios.tendencia.dados[i] = Math.max(0, intercept + slope*i);
-    // Otimista: média móvel com crescimento (+6% ao mês acumulado)
-    cenarios.otimista.dados[i] = mediaMovel * Math.pow(1.06, k+1);
+    cenarios.tendencia.dados[i]   = Math.max(0, intercept + slope*i);
+    cenarios.otimista.dados[i]    = mediaMovel * Math.pow(1.06, k+1);
   });
 
   // ── Dimensões SVG ──
   const W = host.clientWidth || 680, H = 280;
   const padL = 44, padR = 16, padT = 16, padB = 30;
   const plotW = W - padL - padR, plotH = H - padT - padB;
-  const allVals = [...valoresReais, pe,
-    ...Object.values(cenarios).flatMap(c => Object.values(c.dados))];
+  // todos os valores JÁ convertidos para a métrica atual
+  const allVals = [...valoresReais.map(cv), cv(pe),
+    ...Object.values(cenarios).flatMap(c => Object.values(c.dados).map(cv))];
   const maxV = Math.max(...allVals) * 1.1;
   const x = i => padL + (i/11) * plotW;
-  const y = v => padT + plotH - (v/maxV) * plotH;
+  const y = v => padT + plotH - (cv(v)/maxV) * plotH;   // recebe valor em R$, converte e plota
 
-  // pontos histórico
   const histPts = reaisIdx.map(i => `${x(i)},${y(Number(fat[MESES[i]])||0)}`).join(' ');
 
-  // linha de cada cenário (começa no último real para conectar)
   function cenarioLine(c) {
     const pts = [`${x(ultimoReal)},${y(valoresReais[n-1])}`];
     futurosIdx.forEach(i => pts.push(`${x(i)},${y(c.dados[i])}`));
@@ -966,23 +965,22 @@ function renderProjecao() {
   // grid horizontal
   let gridLines = '';
   for (let g=0; g<=4; g++) {
-    const gv = (maxV/4)*g, gy = y(gv);
+    const gvDisp = (maxV/4)*g;  // já na métrica
+    const gy = padT + plotH - (gvDisp/maxV) * plotH;
     gridLines += `<line x1="${padL}" y1="${gy}" x2="${W-padR}" y2="${gy}" stroke="var(--border)" stroke-width="0.5"/>
-      <text x="${padL-6}" y="${gy+3}" text-anchor="end" font-size="9" fill="var(--dim)" font-family="DM Mono,monospace">${(gv/1000).toFixed(0)}k</text>`;
+      <text x="${padL-6}" y="${gy+3}" text-anchor="end" font-size="9" fill="var(--dim)" font-family="DM Mono,monospace">${fmtAxis(gvDisp)}</text>`;
   }
 
   // linha PE
   const peY = y(pe);
   const peLineSvg = `<line x1="${padL}" y1="${peY}" x2="${W-padR}" y2="${peY}" stroke="var(--amber)" stroke-width="1" stroke-dasharray="4 3" opacity="0.7"/>
-    <text x="${W-padR}" y="${peY-4}" text-anchor="end" font-size="9" fill="var(--amber)" font-family="DM Mono,monospace">PE ${fmtK(pe)}</text>`;
+    <text x="${W-padR}" y="${peY-4}" text-anchor="end" font-size="9" fill="var(--amber)" font-family="DM Mono,monospace">PE ${isPed ? Math.round(pe/tm)+' ped' : fmtK(pe)}</text>`;
 
-  // labels meses no eixo X
   let xLabels = '';
   MESES.forEach((m,i) => {
     xLabels += `<text x="${x(i)}" y="${H-10}" text-anchor="middle" font-size="9" fill="var(--dim)">${m}</text>`;
   });
 
-  // linhas dos cenários (futuro, tracejado)
   let cenarioSvg = '';
   Object.entries(cenarios).forEach(([key, c]) => {
     if (!projVisivel[key]) return;
@@ -992,7 +990,6 @@ function renderProjecao() {
     });
   });
 
-  // pontos do histórico
   let histDots = '';
   reaisIdx.forEach(i => {
     const v = Number(fat[MESES[i]])||0;
@@ -1009,9 +1006,15 @@ function renderProjecao() {
       ${xLabels}
     </svg>`;
 
-  // ── Toggles ──
+  // ── Toggles: métrica + cenários ──
   const tg = $('proj-toggles');
-  tg.innerHTML = Object.entries(cenarios).map(([key,c]) => `
+  const metricBtn = (key, label) => `
+    <button data-metric="${key}" style="padding:5px 11px;border-radius:14px;border:0.5px solid ${projMetrica===key?'var(--accent)':'var(--border2)'};background:${projMetrica===key?'var(--accent)':'transparent'};cursor:pointer;font-size:11px;font-family:inherit;color:${projMetrica===key?'#fff':'var(--muted)'};transition:all 0.15s">${label}</button>`;
+  tg.innerHTML =
+    `<div style="display:flex;gap:5px;padding-right:10px;margin-right:4px;border-right:1px solid var(--border)">
+      ${metricBtn('valor','R$ Faturamento')}${metricBtn('pedidos','Nº Pedidos')}
+    </div>` +
+    Object.entries(cenarios).map(([key,c]) => `
     <button data-cen="${key}" style="display:flex;align-items:center;gap:5px;padding:5px 10px;border-radius:14px;border:0.5px solid ${projVisivel[key]?c.cor:'var(--border2)'};background:${projVisivel[key]?c.cor:'transparent'};cursor:pointer;font-size:11px;font-family:inherit;color:${projVisivel[key]?'#fff':'var(--muted)'};transition:all 0.15s">
       <span style="width:7px;height:7px;border-radius:50%;background:${projVisivel[key]?'#fff':c.cor}"></span>${c.nome}
     </button>`).join('') +
@@ -1021,19 +1024,21 @@ function renderProjecao() {
   tg.querySelectorAll('button[data-cen]').forEach(b => {
     b.onclick = () => { projVisivel[b.dataset.cen] = !projVisivel[b.dataset.cen]; renderProjecao(); };
   });
+  tg.querySelectorAll('button[data-metric]').forEach(b => {
+    b.onclick = () => { projMetrica = b.dataset.metric; renderProjecao(); };
+  });
 
   // ── Tooltip ──
   const tip = $('proj-tooltip');
   host.querySelectorAll('.proj-dot').forEach(dot => {
     dot.style.cursor = 'pointer';
-    dot.addEventListener('mouseenter', e => {
-      const r = host.getBoundingClientRect();
+    dot.addEventListener('mouseenter', () => {
       const cx = +dot.getAttribute('cx'), cy = +dot.getAttribute('cy');
       const scale = (host.clientWidth || W) / W;
       tip.style.left = (cx*scale) + 'px';
       tip.style.top  = (cy*scale - 38) + 'px';
       tip.style.transform = 'translateX(-50%)';
-      tip.innerHTML = `${dot.dataset.cen} · ${dot.dataset.mes}<br><strong>${fmtR(Math.round(+dot.dataset.val))}</strong>`;
+      tip.innerHTML = `${dot.dataset.cen} · ${dot.dataset.mes}<br><strong>${fmtFull(+dot.dataset.val)}</strong>`;
       tip.style.opacity = '1';
     });
     dot.addEventListener('mouseleave', () => { tip.style.opacity = '0'; });
@@ -1044,12 +1049,13 @@ function renderProjecao() {
   const projTend = futurosIdx.reduce((a,i)=>a+cenarios.tendencia.dados[i],0);
   const projCons = futurosIdx.reduce((a,i)=>a+cenarios.conservador.dados[i],0);
   const projOtim = futurosIdx.reduce((a,i)=>a+cenarios.otimista.dados[i],0);
+  const unidade = isPed ? 'pedidos' : '';
   $('proj-resumo').innerHTML = `
-    <strong style="color:var(--text)">Projeção para fechar 2026</strong> (realizado ${fmtR(totalReal)} + ${futurosIdx.length} meses projetados):<br>
-    <span style="color:var(--red)">● Conservador:</span> ${fmtR(Math.round(totalReal+projCons))} &nbsp;·&nbsp;
-    <span style="color:var(--accent)">● Tendência:</span> ${fmtR(Math.round(totalReal+projTend))} &nbsp;·&nbsp;
-    <span style="color:var(--green)">● Otimista:</span> ${fmtR(Math.round(totalReal+projOtim))}<br>
-    <span style="font-size:11px;color:var(--dim)">Estimativas baseadas no histórico (média móvel, regressão de tendência e crescimento projetado). Não são garantia de resultado.</span>`;
+    <strong style="color:var(--text)">Projeção para fechar 2026</strong> (realizado ${fmtFull(totalReal)} + ${futurosIdx.length} meses projetados):<br>
+    <span style="color:var(--red)">● Conservador:</span> ${fmtFull(totalReal+projCons)} &nbsp;·&nbsp;
+    <span style="color:var(--accent)">● Tendência:</span> ${fmtFull(totalReal+projTend)} &nbsp;·&nbsp;
+    <span style="color:var(--green)">● Otimista:</span> ${fmtFull(totalReal+projOtim)}<br>
+    <span style="font-size:11px;color:var(--dim)">${isPed ? `Pedidos estimados com base no ticket médio de ${fmtR(tm)}. ` : ''}Estimativas baseadas no histórico (média móvel, regressão de tendência e crescimento projetado). Não são garantia de resultado.</span>`;
 }
 
 // ── VISÃO GERAL ──
