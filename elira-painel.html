@@ -976,12 +976,14 @@ function renderBarChart(pe) {
 // ── FATURAMENTO ──
 function renderFaturamento() {
   const { pe } = calcMetrics();
-  const fat = state.faturamento;
-  const max = Math.max(...Object.values(fat), pe, 1);
+  // Garante que faturamento nunca fica vazio
+  const fat = state.faturamento || DEFAULTS.faturamento;
+  const max = Math.max(...Object.values(fat).map(Number), pe, 1);
   const el  = $('month-rows');
+  if (!el) return;
 
   el.innerHTML = MESES.map(m => {
-    const v = fat[m] || 0;
+    const v = Number(fat[m]) || 0;
     const pct   = clamp((v / max) * 100, 0, 100);
     const color = v === 0 ? 'var(--dim)' : (v >= pe ? 'var(--green)' : 'var(--red)');
     return `
@@ -997,7 +999,8 @@ function renderFaturamento() {
       </div>`;
   }).join('');
 
-  $('total-acumulado').textContent = fmtR(Object.values(fat).reduce((a,b) => a + (b||0), 0));
+  const totalAcum = $('total-acumulado');
+  if (totalAcum) totalAcum.textContent = fmtR(Object.values(fat).reduce((a,b) => a + (Number(b)||0), 0));
 
   el.querySelectorAll('[data-save]').forEach(btn => {
     btn.addEventListener('click', () => {
