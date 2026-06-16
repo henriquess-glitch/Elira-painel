@@ -878,13 +878,13 @@ function renderAll() {
 
 // ── VISÃO GERAL ──
 function renderVisao() {
-  const { mc, pe, fat10, fat20, fat30, fatAtual, resultado, mesAtual, totalFixos } = calcMetrics();
+  const { mc, pe, fat10, fat20, fat30, fatAtual, resultado, mesAtual, totalFixos, lista } = calcMetrics();
 
   $('kpi-pe').textContent  = fmtK(pe);
   $('kpi-mc').textContent  = fmtP(mc * 100);
   $('kpi-cf').textContent  = fmtK(totalFixos);
   const cfSub = $('kpi-cf') && $('kpi-cf').closest && $('kpi-cf').closest('.metric-card');
-  if (cfSub) { const s = cfSub.querySelector('.metric-sub'); if(s) s.textContent = `${lista.length + (state.extras_mes||[]).length} categorias`; }
+  if (cfSub) { const s = cfSub.querySelector('.metric-sub'); if(s) s.textContent = `${(lista||[]).length + (state.extras_mes||[]).length} categorias`; }
 
   const isPos = resultado >= 0;
   $('kpi-resultado').textContent = fmtK(Math.abs(resultado));
