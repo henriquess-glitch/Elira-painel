@@ -822,7 +822,6 @@ async function showApp() {
     `${now.toLocaleDateString('pt-BR',{month:'long',year:'numeric'})} · Atualizado agora`;
 
   if (firebaseReady) {
-    // load data
     const ref = doc(db, 'elira', 'config');
     onSnapshot(ref, snap => {
       if (snap.exists()) {
@@ -830,8 +829,14 @@ async function showApp() {
         state = { ...DEFAULTS, ...d,
           faturamento: { ...DEFAULTS.faturamento, ...(d.faturamento || {}) },
           extras_mes: d.extras_mes || [],
-          custos_fixos_lista: d.custos_fixos_lista || DEFAULTS.custos_fixos_lista
+          custos_fixos_lista: (d.custos_fixos_lista && d.custos_fixos_lista.length > 0)
+            ? d.custos_fixos_lista
+            : DEFAULTS.custos_fixos_lista
         };
+      } else {
+        // Primeira vez — inicializa com DEFAULTS e salva no Firebase
+        state = JSON.parse(JSON.stringify(DEFAULTS));
+        setDoc(ref, state).catch(e => console.warn('Erro ao inicializar:', e));
       }
       renderAll();
     });
@@ -868,7 +873,8 @@ function renderVisao() {
   $('kpi-pe').textContent  = fmtK(pe);
   $('kpi-mc').textContent  = fmtP(mc * 100);
   $('kpi-cf').textContent  = fmtK(totalFixos);
-  $('kpi-cf').closest('.metric-card').querySelector('.metric-sub').textContent = `${CUSTOS_FIXOS_DETALHE.length + (state.extras_mes||[]).length} categorias`;
+  const cfSub = $('kpi-cf') && $('kpi-cf').closest && $('kpi-cf').closest('.metric-card');
+  if (cfSub) { const s = cfSub.querySelector('.metric-sub'); if(s) s.textContent = `${lista.length + (state.extras_mes||[]).length} categorias`; }
 
   const isPos = resultado >= 0;
   $('kpi-resultado').textContent = fmtK(Math.abs(resultado));
