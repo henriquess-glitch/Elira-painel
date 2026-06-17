@@ -494,6 +494,17 @@
           <div id="proj-resumo" style="margin-top:16px;padding:12px 14px;background:var(--surf);border-radius:8px;font-size:12px;color:var(--muted);line-height:1.6"></div>
         </div>
       </div>
+
+      <div class="section">
+        <div class="section-label">Comparar meses</div>
+        <div class="card">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:14px;line-height:1.5">
+            Selecione um ou mais meses para ver os números individualmente e comparar entre eles.
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:18px" id="cmp-meses"></div>
+          <div id="cmp-conteudo"></div>
+        </div>
+      </div>
     </div>
 
     <!-- FATURAMENTO -->
@@ -890,6 +901,110 @@ function renderAll() {
   renderCustos();
   renderConfig();
   try { renderProjecao(); } catch(e) { console.warn('Projeção:', e); }
+  try { renderComparacao(); } catch(e) { console.warn('Comparação:', e); }
+}
+
+// meses selecionados para comparação (sessão)
+const cmpSelecionados = new Set();
+
+// ── COMPARAR MESES ──
+function renderComparacao() {
+  const fat = state.faturamento || DEFAULTS.faturamento;
+  const { mc, pe } = calcMetrics();
+  const tm = state.ticket_medio || 701.56;
+  const cmvPeca = state.cmv_por_peca || 160.95;
+
+  // meses com dados (valor > 0)
+  const comDados = MESES.filter(m => (Number(fat[m])||0) > 0);
+  if (comDados.length === 0) {
+    $('cmp-meses').innerHTML = '';
+    $('cmp-conteudo').innerHTML = '<div style="padding:16px;text-align:center;color:var(--dim);font-size:13px">Adicione faturamento para comparar meses.</div>';
+    return;
+  }
+
+  // se nada selecionado ainda, seleciona o último mês com dados
+  if (cmpSelecionados.size === 0) {
+    cmpSelecionados.add(comDados[comDados.length - 1]);
+  }
+
+  // botões de mês
+  $('cmp-meses').innerHTML = comDados.map(m => {
+    const on = cmpSelecionados.has(m);
+    return `<button data-mes="${m}" style="padding:6px 14px;border-radius:14px;border:0.5px solid ${on?'var(--accent)':'var(--border2)'};background:${on?'var(--accent)':'transparent'};cursor:pointer;font-size:12px;font-family:inherit;color:${on?'#fff':'var(--muted)'};transition:all 0.15s">${m}</button>`;
+  }).join('');
+
+  $('cmp-meses').querySelectorAll('button[data-mes]').forEach(b => {
+    b.onclick = () => {
+      const m = b.dataset.mes;
+      if (cmpSelecionados.has(m)) {
+        if (cmpSelecionados.size > 1) cmpSelecionados.delete(m); // mantém ao menos 1
+      } else {
+        cmpSelecionados.add(m);
+      }
+      renderComparacao();
+    };
+  });
+
+  // calcula métricas de cada mês selecionado, em ordem cronológica
+  const selOrdenado = MESES.filter(m => cmpSelecionados.has(m));
+  const dados = selOrdenado.map(m => {
+    const receita  = Number(fat[m]) || 0;
+    const pedidos  = receita / tm;
+    const mcValor  = receita * mc;            // margem de contribuição em R$
+    const acimaPE  = receita - pe;            // quanto acima/abaixo do PE
+    return { mes: m, receita, pedidos, mcValor, acimaPE };
+  });
+
+  // melhor e pior para destaque
+  const maxReceita = Math.max(...dados.map(d => d.receita));
+  const minReceita = Math.min(...dados.map(d => d.receita));
+
+  // cards individuais + comparação
+  const fmtPed = v => `${Math.round(v)} ped`;
+  let html = `<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px">`;
+  dados.forEach(d => {
+    const isBest = d.receita === maxReceita && dados.length > 1;
+    const isWorst = d.receita === minReceita && dados.length > 1;
+    const tag = isBest ? `<span style="font-size:9px;color:var(--green);background:var(--greend);padding:2px 6px;border-radius:4px;margin-left:6px">melhor</span>`
+              : isWorst ? `<span style="font-size:9px;color:var(--red);background:var(--redd);padding:2px 6px;border-radius:4px;margin-left:6px">menor</span>` : '';
+    const peCor = d.acimaPE >= 0 ? 'var(--green)' : 'var(--red)';
+    html += `
+      <div style="border:0.5px solid var(--border);border-radius:10px;padding:14px;background:var(--card)">
+        <div style="font-size:13px;font-weight:600;margin-bottom:10px">${d.mes} 2026${tag}</div>
+        <div style="font-size:11px;color:var(--dim);margin-bottom:2px">Faturamento</div>
+        <div style="font-size:18px;font-weight:700;font-family:var(--mono);color:var(--accent);margin-bottom:10px">${fmtR(d.receita)}</div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+          <span style="color:var(--muted)">Pedidos</span><span style="font-family:var(--mono)">${Math.round(d.pedidos)}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px;margin-bottom:5px">
+          <span style="color:var(--muted)">Margem contrib.</span><span style="font-family:var(--mono);color:var(--green)">${fmtR(Math.round(d.mcValor))}</span>
+        </div>
+        <div style="display:flex;justify-content:space-between;font-size:12px">
+          <span style="color:var(--muted)">vs. equilíbrio</span><span style="font-family:var(--mono);color:${peCor}">${d.acimaPE>=0?'+':''}${fmtR(Math.round(d.acimaPE))}</span>
+        </div>
+      </div>`;
+  });
+  html += `</div>`;
+
+  // se 2+ meses, mostra comparação direta (variação)
+  if (dados.length >= 2) {
+    const primeiro = dados[0], ultimo = dados[dados.length-1];
+    const varReceita = primeiro.receita > 0 ? ((ultimo.receita - primeiro.receita)/primeiro.receita*100) : 0;
+    const varPedidos = primeiro.pedidos > 0 ? ((ultimo.pedidos - primeiro.pedidos)/primeiro.pedidos*100) : 0;
+    const totalReceita = dados.reduce((a,d)=>a+d.receita,0);
+    const mediaReceita = totalReceita / dados.length;
+    const cor = varReceita >= 0 ? 'var(--green)' : 'var(--red)';
+    html += `
+      <div style="margin-top:16px;padding:14px;background:var(--surf);border-radius:8px;font-size:12px;color:var(--muted);line-height:1.7">
+        <strong style="color:var(--text)">Comparação ${primeiro.mes} → ${ultimo.mes}</strong><br>
+        Variação de faturamento: <strong style="color:${cor}">${varReceita>=0?'+':''}${varReceita.toFixed(1)}%</strong>
+        &nbsp;·&nbsp; Variação de pedidos: <strong style="color:${cor}">${varPedidos>=0?'+':''}${varPedidos.toFixed(1)}%</strong><br>
+        Soma dos ${dados.length} meses: <strong style="color:var(--accent)">${fmtR(totalReceita)}</strong>
+        &nbsp;·&nbsp; Média mensal: <strong style="color:var(--accent)">${fmtR(Math.round(mediaReceita))}</strong>
+      </div>`;
+  }
+
+  $('cmp-conteudo').innerHTML = html;
 }
 
 // estado dos cenários visíveis e métrica (persistido só na sessão)
